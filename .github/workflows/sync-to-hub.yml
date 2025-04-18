@@ -15,4 +15,4 @@ jobs:
       - name: Push to hub
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: git push --force https://ObaNifemiAluko:$HF_TOKEN@huggingface.co/spaces/ObaNifemiAluko/linkedin-post-analyzer main
+        run: git push --force https://NifemiAluko:$HF_TOKEN@huggingface.co/spaces/NifemiAluko/linkedin-post-analyzer main
