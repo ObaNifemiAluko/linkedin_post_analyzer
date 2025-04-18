@@ -16,18 +16,18 @@
 ## Content Analysis
 ### Most Common Topics
 - Education/Learning: AI Tools and Platforms: 2 posts
-- Education/Learning: AI Fundamentals: 1 posts
+- Industry Insights: AI: 1 posts
 
 ### Top Topics in High-Performing Posts
-- Education/Learning: AI Tools and Platforms: 1 posts
+- Industry Insights: AI: 1 posts
 
 ### Writing Tone Distribution
-- Neutral: 2 posts
+- Informal: 2 posts
 - Friendly: 1 posts
 
 ### Content Intent
-- Inform: 2 posts
-- Describe: 1 posts
+- Describe: 2 posts
+- Inform: 1 posts
 
 ## Readability Analysis
 - Posts with High Readability (Score > 60): 0 posts
@@ -42,5 +42,5 @@
 ## Recommendations
 1. Content Length: Aim for 345 words (average of top performing posts)
 2. Readability: Target a Flesch reading ease score of 37
-3. Most Effective Topics: Focus on Education/Learning: AI Tools and Platforms
-4. Recommended Tone: Primarily use Neutral
+3. Most Effective Topics: Focus on Industry Insights: AI
+4. Recommended Tone: Primarily use Informal
