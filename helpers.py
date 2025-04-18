@@ -13,7 +13,8 @@ from langchain_core.tools import Tool
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_openai_tools_agent, AgentExecutor
 from langchain_core.prompts import ChatPromptTemplate
-from langchain.agents import create_pandas_dataframe_agent
+from langchain_experimental.agents import create_pandas_dataframe_agent
+from langchain.prompts import MessagesPlaceholder
 
 # Ensure NLTK resources are downloaded
 nltk.download('vader_lexicon')
@@ -488,4 +489,63 @@ def setup_langchain_agent(df):
         return agent
     except Exception as e:
         print(f"Error setting up LangChain agent: {str(e)}")
+        return None
+
+def setup_safe_analysis_agent(df):
+    """Set up a safe LangChain agent that can perform calculations and analysis on the DataFrame"""
+    try:
+        # Create a Pandas DataFrame agent with safety constraints
+        llm = ChatOpenAI(
+            model_name="gpt-4",
+            temperature=0.2
+        )
+        
+        # Define safe analysis tools
+        tools = [
+            Tool(
+                name="analyze_column_stats",
+                func=lambda col: df[col].describe().to_dict() if col in df.columns else {"error": "Column not found"},
+                description="Get statistical summary of a column. Input should be the column name."
+            ),
+            Tool(
+                name="get_high_performing",
+                func=lambda *args: df[df['Reactions'] > df['Reactions'].quantile(0.75)].to_dict('records'),
+                description="Get high performing posts (top 25%). No input needed."
+            ),
+            Tool(
+                name="get_correlation",
+                func=lambda col1, col2: float(df[col1].corr(df[col2])) if col1 in df.columns and col2 in df.columns else None,
+                description="Calculate correlation between two columns. Input should be two column names."
+            )
+        ]
+        
+        # Create the agent with the safe tools
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", """You are an expert data analyst specializing in LinkedIn post analytics.
+            You have access to a DataFrame with LinkedIn post data and metrics.
+            You can perform calculations, statistical analysis, and answer questions about the data.
+            Analyze the data carefully and provide detailed insights backed by specific metrics.
+            
+            The DataFrame includes the following columns:
+            - Full Post: The complete text of the LinkedIn post
+            - Reactions: Number of reactions (likes etc.) received
+            - Comment: Number of comments received
+            - Reposts: Number of reposts/shares
+            - Word Count: Number of words in the post
+            - Flesch Reading Ease: Readability score
+            - Topic: The main topic category of the post
+            - Writing Tone: The tone used in the post
+            - Intent: The purpose of the post (Inform, Convince, etc.)
+            - Formatting: Structure and formatting characteristics"""),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("human", "{input}"),
+            ("assistant", "{agent_scratchpad}")
+        ])
+        
+        agent = create_openai_tools_agent(llm, tools, prompt)
+        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+        
+        return agent_executor
+    except Exception as e:
+        print(f"Error setting up safe analysis agent: {str(e)}")
         return None 

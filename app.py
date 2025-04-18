@@ -263,14 +263,14 @@ def setup_langchain_agent(df):
     try:
         # Create a Pandas DataFrame agent
         llm = ChatOpenAI(
-            model_name="gpt-4",
+            model_name="gpt-4o",
             temperature=0.2
         )
         agent = create_pandas_dataframe_agent(
             llm, 
             df, 
             verbose=True,
-            allow_dangerous_code=True,
+            allow_dangerous_code=True,  # Add this line to explicitly allow code execution
             handle_parsing_errors=True,
             include_df_in_prompt=True,
             prefix="""You are an expert data analyst specializing in LinkedIn post analytics.
