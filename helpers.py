@@ -165,11 +165,11 @@ def generate_summary(df):
         print("DataFrame columns:", df.columns.tolist())
         print("DataFrame head:", df.head())
         
-        # Calculate overall statistics
+        # Calculate overall statistics with safe handling of None values
         total_posts = len(df)
-        avg_reactions = df['Reactions'].mean()
-        avg_comments = df['Comment'].mean()
-        avg_reposts = df['Reposts'].mean()
+        avg_reactions = df['Reactions'].fillna(0).mean()
+        avg_comments = df['Comment'].fillna(0).mean()
+        avg_reposts = df['Reposts'].fillna(0).mean()
         avg_word_count = df['Word Count'].fillna(0).mean()
         avg_reading_ease = df['Flesch Reading Ease'].fillna(0).mean()
         
@@ -183,23 +183,23 @@ def generate_summary(df):
                 media_posts = df[df['Media Creative'] == media_type]
                 media_engagement[media_type] = {
                     'count': len(media_posts),
-                    'avg_reactions': media_posts['Reactions'].mean(),
-                    'avg_comments': media_posts['Comment'].mean(),
-                    'avg_reposts': media_posts['Reposts'].mean(),
-                    'avg_engagement': media_posts['Engagement_rate'].mean() if 'Engagement_rate' in df.columns else None
+                    'avg_reactions': media_posts['Reactions'].fillna(0).mean(),
+                    'avg_comments': media_posts['Comment'].fillna(0).mean(),
+                    'avg_reposts': media_posts['Reposts'].fillna(0).mean(),
+                    'avg_engagement': media_posts['Engagement_rate'].fillna(0).mean() if 'Engagement_rate' in df.columns else 0
                 }
             
         # Add Engagement_rate (with error handling if column doesn't exist)
-        avg_Engagement_rate = df['Engagement_rate'].mean() if 'Engagement_rate' in df.columns else None
+        avg_engagement_rate = df['Engagement_rate'].fillna(0).mean() if 'Engagement_rate' in df.columns else 0
         
         # Get high performing posts (top 25%)
         high_performing = df[df['Reactions'] > df['Reactions'].quantile(0.75)].copy()
         low_performing = df[df['Reactions'] < df['Reactions'].quantile(0.25)].copy()
         
-        # Get top performing content characteristics
-        top_topics = df['Topic'].value_counts().head(3)
-        top_tones = df['Writing Tone'].value_counts().head(3)
-        top_intents = df['Intent'].value_counts().head(3)
+        # Get top performing content characteristics with safe handling
+        top_topics = df['Topic'].fillna('Unknown').value_counts().head(3)
+        top_tones = df['Writing Tone'].fillna('Unknown').value_counts().head(3)
+        top_intents = df['Intent'].fillna('Unknown').value_counts().head(3)
         
         # Analyze formatting and structure
         formats = df['Formatting'].str.split('|', expand=True)
@@ -227,7 +227,7 @@ def generate_summary(df):
 - Average Reactions: {avg_reactions:.1f}
 - Average Comments: {avg_comments:.1f}
 - Average Reposts: {avg_reposts:.1f}
-- Average Engagement Rate: {avg_Engagement_rate:.1f}
+- Average Engagement Rate: {avg_engagement_rate:.1f}
 - Average Word Count: {avg_word_count:.1f} words
 - Average Reading Ease Score: {avg_reading_ease:.1f}"""
 
@@ -244,7 +244,7 @@ def generate_summary(df):
                 summary += f"\n- Average Reactions: {metrics['avg_reactions']:.1f}"
                 summary += f"\n- Average Comments: {metrics['avg_comments']:.1f}"
                 summary += f"\n- Average Reposts: {metrics['avg_reposts']:.1f}"
-                if metrics['avg_engagement'] is not None:
+                if metrics['avg_engagement'] > 0:
                     summary += f"\n- Average Engagement Rate: {metrics['avg_engagement']:.1f}%"
             
             # Add media type analysis for high-performing posts
@@ -259,9 +259,9 @@ def generate_summary(df):
                         summary += f"\n  - Average Engagement Rate: {media_posts['Engagement_rate'].mean():.1f}%"
 
         # Add Engagement_rate to Overall Statistics if it exists
-        if avg_Engagement_rate is not None:
+        if avg_engagement_rate > 0:
             summary += f"""
-- Average Engagement Rate: {avg_Engagement_rate:.1f}"""
+- Average Engagement Rate: {avg_engagement_rate:.1f}"""
 
         summary += f"""
 - Average Word Count: {avg_word_count:.1f} words
