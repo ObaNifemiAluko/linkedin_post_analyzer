@@ -770,8 +770,7 @@ def main():
         with gr.Row():
             with gr.Column():
                 chatbot = gr.Chatbot(
-                    label="Chat about your LinkedIn Post Analysis",
-                    type="messages"
+                    label="Chat about your LinkedIn Post Analysis"
                 )
                 msg = gr.Textbox(label="Ask questions about the analysis results")
                 
