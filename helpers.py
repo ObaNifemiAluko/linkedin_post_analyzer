@@ -548,4 +548,28 @@ def setup_safe_analysis_agent(df):
         return agent_executor
     except Exception as e:
         print(f"Error setting up safe analysis agent: {str(e)}")
+        return None
+
+# Add the missing setup_enhanced_analysis_agent function
+def setup_enhanced_analysis_agent(df):
+    """Set up an enhanced LangChain agent that can perform calculations and analysis on the DataFrame"""
+    try:
+        # Create a Pandas DataFrame agent
+        llm = ChatOpenAI(
+            model_name="gpt-4",
+            temperature=0.2
+        )
+        
+        # Use the pandas dataframe agent
+        agent = create_pandas_dataframe_agent(
+            llm, 
+            df, 
+            verbose=True,
+            handle_parsing_errors=True,
+            include_df_in_prompt=True
+        )
+        
+        return agent
+    except Exception as e:
+        print(f"Error setting up enhanced analysis agent: {str(e)}")
         return None 
