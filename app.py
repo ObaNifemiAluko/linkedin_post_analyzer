@@ -736,7 +736,7 @@ def chat_with_data_safe(question, df, chat_history=None, summary=None):
     
     # Create the Gradio interface
     with gr.Blocks() as demo:
-        chatbot = gr.Chatbot(show_label=False, type='messages')
+        chatbot = gr.Chatbot(show_label=False)
         msg = gr.Textbox(label="Ask questions about the analysis results")
         clear = gr.Button("Clear")
         
@@ -769,7 +769,7 @@ def main():
 
         with gr.Row():
             with gr.Column():
-                chatbot = gr.Chatbot(show_label=False, type='messages')
+                chatbot = gr.Chatbot(show_label=False)
                 msg = gr.Textbox(label="Ask questions about the analysis results")
                 
                 # Add a checkbox for switching between safe and enhanced mode
