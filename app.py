@@ -263,14 +263,14 @@ def setup_langchain_agent(df):
     try:
         # Create a Pandas DataFrame agent
         llm = ChatOpenAI(
-            model_name="gpt-4o",
+            model_name="gpt-4",
             temperature=0.2
         )
         agent = create_pandas_dataframe_agent(
             llm, 
             df, 
             verbose=True,
-            allow_dangerous_code=True,  # Add this line to explicitly allow code execution
+            allow_dangerous_code=True,
             handle_parsing_errors=True,
             include_df_in_prompt=True,
             prefix="""You are an expert data analyst specializing in LinkedIn post analytics.
@@ -297,225 +297,85 @@ def setup_langchain_agent(df):
         return None
 
 def chat_with_data_enhanced(question, df, chat_history=None, summary=None):
+    """Enhanced version of chat_with_data that uses OpenAI for more natural responses"""
     try:
-        if df is None:
-            return [
-                {"role": "user", "content": question},
-                {"role": "assistant", "content": "Please analyze a file first."}
-            ]
-            
-        # Create a copy to work with
-        df = df.copy()
-        print(f"Columns available for analysis: {df.columns.tolist()}")
-        
-        # Ensure key columns are numeric
-        for col in ['Reactions', 'Comment', 'Reposts', 'Word Count', 'Flesch Reading Ease', 'Engagement_rate']:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
-                print(f"Converted {col} to numeric. Sample: {df[col].head(3).tolist()}")
-        
-        # For debugging - explicitly check if Engagement_rate is in the dataframe
-        if 'Engagement_rate' in df.columns:
-            print(f"Engagement rate column is present. Mean value: {df['Engagement_rate'].mean()}")
-        else:
-            print("Warning: Engagement_rate column is not present in the dataframe")
-        
-        # Create data context
-        data_details = []
-        data_details.append(f"## LinkedIn Post Analysis Data\n")
-        data_details.append(f"General Statistics:")
-        data_details.append(f"- Total posts analyzed: {len(df)}")
-        
-        # Add engagement metrics
-        metrics = {
-            'Reactions': 'reactions',
-            'Comment': 'comments', 
-            'Reposts': 'reposts',
-            'Engagement_rate': 'engagement rate'
-        }
-        
-        for col, label in metrics.items():
-            if col in df.columns:
-                data_details.append(f"\n{label.title()} Metrics:")
-                data_details.append(f"- Highest {label}: {df[col].max():.1f}")
-                data_details.append(f"- Average {label}: {df[col].mean():.1f}")
-                data_details.append(f"- Median {label}: {df[col].median():.1f}")
-                
-                # Top posts by this metric
-                data_details.append(f"\nTop Posts by {label.title()}:")
-                top_posts = df.nlargest(3, col)
-                for i, row in top_posts.iterrows():
-                    title = row.get('Title', 'Untitled post')
-                    value = row.get(col, 0)
-                    data_details.append(f"- {title} ({value:.1f} {label})")
-        
-        # Specific analysis based on question
-        specific_analysis = []
-        
-        # For questions about top performing posts
-        if any(term in question.lower() for term in ["top", "best", "highest", "most"]):
-            # If asking specifically about engagement rate
-            if "engagement rate" in question.lower() or "Engagement_rate" in question.lower():
-                if 'Engagement_rate' in df.columns:
-                    top_posts = df.nlargest(3, 'Engagement_rate')
-                    specific_analysis.append(f"\n## Posts with Highest Engagement Rate")
-                    specific_analysis.append(f"Average Engagement Rate: {top_posts['Engagement_rate'].mean():.1f}")
-                    specific_analysis.append(f"Average Reactions: {top_posts['Reactions'].mean():.1f}")
-                    specific_analysis.append(f"Average Comments: {top_posts['Comment'].mean():.1f}")
-                    
-                    # Include topic and tone analysis for top engagement rate posts
-                    if 'Topic' in top_posts.columns:
-                        topics = top_posts['Topic'].value_counts()
-                        specific_analysis.append(f"\nCommon Topics in High Engagement Posts:")
-                        for topic, count in topics.items():
-                            specific_analysis.append(f"- {topic}: {count} posts")
-                            
-                    if 'Writing Tone' in top_posts.columns:
-                        tones = top_posts['Writing Tone'].value_counts()
-                        specific_analysis.append(f"\nCommon Tones in High Engagement Posts:")
-                        for tone, count in tones.items():
-                            specific_analysis.append(f"- {tone}: {count} posts")
-                else:
-                    specific_analysis.append(f"\nEngagement rate data is not available in this dataset.")
-            
-            # If asking about reactions but want to know engagement rate too
-            elif "reactions" in question.lower() and "engagement" in question.lower():
-                top_posts = df.nlargest(3, 'Reactions')
-                specific_analysis.append(f"\n## Posts with Highest Reactions and their Engagement")
-                specific_analysis.append(f"Average Reactions: {top_posts['Reactions'].mean():.1f}")
-                specific_analysis.append(f"Average Comments: {top_posts['Comment'].mean():.1f}")
-                
-                if 'Engagement_rate' in df.columns:
-                    specific_analysis.append(f"Average Engagement Rate: {top_posts['Engagement_rate'].mean():.1f}")
-                else:
-                    specific_analysis.append(f"Engagement rate data is not available for these posts.")
-            
-            # For general top posts analysis (add engagement rate if available)
-            elif "posts" in question.lower():
-                top_posts = df.nlargest(5, 'Reactions')
-                specific_analysis.append(f"\n## Analysis of Top Performing Posts")
-                specific_analysis.append(f"Average Reactions: {top_posts['Reactions'].mean():.1f}")
-                specific_analysis.append(f"Average Comments: {top_posts['Comment'].mean():.1f}")
-                specific_analysis.append(f"Average Word Count: {top_posts['Word Count'].mean():.1f} words")
-                specific_analysis.append(f"Average Reading Ease: {top_posts['Flesch Reading Ease'].mean():.2f}")
-                
-                if 'Engagement_rate' in df.columns:
-                    specific_analysis.append(f"Average Engagement Rate: {top_posts['Engagement_rate'].mean():.1f}")
-                
-                # Include common characteristics
-                if 'Topic' in top_posts.columns:
-                    topics = top_posts['Topic'].value_counts()
-                    specific_analysis.append(f"\nCommon Topics in Top Posts:")
-                    for topic, count in topics.items():
-                        specific_analysis.append(f"- {topic}: {count} posts")
-                        
-                if 'Writing Tone' in top_posts.columns:
-                    tones = top_posts['Writing Tone'].value_counts()
-                    specific_analysis.append(f"\nCommon Tones in Top Posts:")
-                    for tone, count in tones.items():
-                        specific_analysis.append(f"- {tone}: {count} posts")
-        
-        # Handle questions about specific engagement rate ranges or thresholds
-        if "engagement rate" in question.lower() and any(term in question.lower() for term in ["above", "over", "higher than", "greater than"]):
-            if 'Engagement_rate' in df.columns:
-                # Try to extract a threshold value from the question
-                threshold = 0
-                for word in question.lower().split():
-                    try:
-                        threshold = float(word)
-                        break
-                    except ValueError:
-                        continue
-                
-                # If no threshold found, use the average as default
-                if threshold == 0:
-                    threshold = df['Engagement_rate'].mean()
-                
-                high_engagement_posts = df[df['Engagement_rate'] > threshold]
-                specific_analysis.append(f"\n## Posts with Engagement Rate > {threshold:.1f}")
-                specific_analysis.append(f"Number of Posts: {len(high_engagement_posts)}")
-                specific_analysis.append(f"Average Engagement Rate: {high_engagement_posts['Engagement_rate'].mean():.1f}")
-                specific_analysis.append(f"Average Reactions: {high_engagement_posts['Reactions'].mean():.1f}")
-                specific_analysis.append(f"Average Comments: {high_engagement_posts['Comment'].mean():.1f}")
-                
-                # Include characteristics of high engagement posts
-                if len(high_engagement_posts) > 0:
-                    if 'Topic' in high_engagement_posts.columns:
-                        topics = high_engagement_posts['Topic'].value_counts()
-                        specific_analysis.append(f"\nCommon Topics in High Engagement Posts:")
-                        for topic, count in topics.items():
-                            specific_analysis.append(f"- {topic}: {count} posts")
-                            
-                    if 'Writing Tone' in high_engagement_posts.columns:
-                        tones = high_engagement_posts['Writing Tone'].value_counts()
-                        specific_analysis.append(f"\nCommon Tones in High Engagement Posts:")
-                        for tone, count in tones.items():
-                            specific_analysis.append(f"- {tone}: {count} posts")
-            else:
-                specific_analysis.append(f"\nEngagement rate data is not available in this dataset.")
-        
-        # Data context and specific analysis
-        prompt_parts = []
-        prompt_parts.append("You are a professional LinkedIn content analyst providing insights based on post data analysis.")
-        prompt_parts.append("\n".join(data_details))
-        
-        if specific_analysis:
-            prompt_parts.append("\n".join(specific_analysis))
-            
-        if summary:
-            prompt_parts.append(f"\nOverall Content Analysis Summary:\n{summary[:1500]}...")
-            
-        # Add chat history context (last 3 exchanges)
-        if chat_history and len(chat_history) > 0:
-            history_text = []
-            for i in range(max(0, len(chat_history)-3), len(chat_history)):
-                if chat_history[i]["role"] == "user":
-                    history_text.append(f"Previous question: {chat_history[i]['content']}")
-                else:
-                    history_text.append(f"Previous answer: {chat_history[i]['content'][:100]}...")
-            prompt_parts.append("\n".join(history_text))
-        
-        # Add the enhanced question
-        enhanced_question = f"""
-Based on the LinkedIn post data, please answer this question:
-{question}
-
-If calculations or statistical analysis are needed, perform them on the DataFrame.
-Provide specific numbers and data-backed insights in your answer.
-"""
-        prompt_parts.append(enhanced_question)
-        
-        # Build the final prompt
-        prompt = "\n\n".join(prompt_parts)
-        
-        # Use a higher temperature for more varied responses
-        chat = ChatOpenAI(temperature=0.3)
-        response = chat.predict(prompt)
-        
-        # Append to history and return
+        # Initialize chat history if None
         if chat_history is None:
             chat_history = []
-            
-        chat_history.append({"role": "user", "content": question})
-        chat_history.append({"role": "assistant", "content": response})
+        # Convert tuple format to list format if needed
+        elif isinstance(chat_history, list) and len(chat_history) > 0 and isinstance(chat_history[0], list):
+            chat_history = [
+                {"role": "user" if i % 2 == 0 else "assistant", "content": msg}
+                for pair in chat_history
+                for i, msg in enumerate(pair)
+            ]
+
+        if df is None:
+            return [
+                [question, "Please analyze a file first."]
+            ]
         
-        return chat_history
+        # Debug what we received
+        print(f"\nAccessing dataframe with {len(df)} rows and {len(df.columns)} columns")
+        print(f"Available columns: {df.columns.tolist()}")
+        
+        # Create the agent
+        agent_executor = setup_enhanced_analysis_agent(df)
+        if agent_executor is None:
+            return [
+                [question, "Failed to initialize analytics system. Please try again."]
+            ]
+        
+        # Prepare context to include with the question
+        context = ""
+        
+        # Add summary if available
+        if summary:
+            summary_brief = summary[:500] + "..." if len(summary) > 500 else summary
+            context += f"Summary of previous analysis:\n{summary_brief}\n\n"
+            
+        # Enhanced question with context if needed
+        enhanced_question = f"{context}Based on the LinkedIn post data, {question}"
+        
+        # Format chat history for the agent
+        formatted_history = []
+        for msg in chat_history:
+            if isinstance(msg, dict):
+                role = msg.get("role", "")
+                content = msg.get("content", "")
+                if role == "user":
+                    formatted_history.append(("human", content))
+                elif role == "assistant":
+                    formatted_history.append(("ai", content))
+        
+        try:
+            # Use the agent to answer the question
+            response = agent_executor.invoke({"input": enhanced_question, "chat_history": formatted_history})
+            answer = response.get("output", "I couldn't generate a response. Please try asking your question differently.")
+            
+            # Ensure the answer is a string
+            if not isinstance(answer, str):
+                answer = str(answer)
+            
+            # Return in the format Gradio expects: list of [user_message, assistant_message] pairs
+            return [
+                [question, answer]
+            ]
+            
+        except Exception as agent_error:
+            print(f"Agent error: {str(agent_error)}")
+            return [
+                [question, f"I encountered an error while processing your question: {str(agent_error)}"]
+            ]
         
     except Exception as e:
         print(f"Chat error: {str(e)}")
         import traceback
         traceback.print_exc()
         
-        error_message = f"Error processing question: {str(e)}"
-        
-        # Return error in the correct format
-        user_message = {"role": "user", "content": question}
-        assistant_message = {"role": "assistant", "content": error_message}
-        
-        if chat_history is None:
-            return [user_message, assistant_message]
-        else:
-            return chat_history + [user_message, assistant_message]
+        return [
+            [question, f"Error processing question: {str(e)}"]
+        ]
 
 def analyze_correlations(df, metric1, metric2):
     """Analyze the correlation between two metrics in the DataFrame"""
@@ -638,14 +498,17 @@ def chat_with_data_safe(question, df, chat_history=None, summary=None):
         # Initialize chat history if None
         if chat_history is None:
             chat_history = []
-        # Ensure chat_history is a list, not a DataFrame
-        elif isinstance(chat_history, pd.DataFrame):
-            chat_history = chat_history.values.tolist()
+        # Convert tuple format to list format if needed
+        elif isinstance(chat_history, list) and len(chat_history) > 0 and isinstance(chat_history[0], list):
+            chat_history = [
+                {"role": "user" if i % 2 == 0 else "assistant", "content": msg}
+                for pair in chat_history
+                for i, msg in enumerate(pair)
+            ]
 
         if df is None:
-            return chat_history + [
-                {"role": "user", "content": question},
-                {"role": "assistant", "content": "Please analyze a file first."}
+            return [
+                ["Please analyze a file first.", None]
             ]
         
         # Debug what we received
@@ -655,9 +518,8 @@ def chat_with_data_safe(question, df, chat_history=None, summary=None):
         # Create the agent
         agent_executor = setup_safe_analysis_agent(df)
         if agent_executor is None:
-            return chat_history + [
-                {"role": "user", "content": question},
-                {"role": "assistant", "content": "Failed to initialize analytics system. Please try again."}
+            return [
+                [question, "Failed to initialize analytics system. Please try again."]
             ]
         
         # Prepare context to include with the question
@@ -691,30 +553,15 @@ def chat_with_data_safe(question, df, chat_history=None, summary=None):
             if not isinstance(answer, str):
                 answer = str(answer)
             
-            # Format for Gradio
-            new_messages = [
-                {"role": "user", "content": question},
-                {"role": "assistant", "content": answer}
+            # Return in the format Gradio expects: list of [user_message, assistant_message] pairs
+            return [
+                [question, answer]
             ]
-            
-            # Ensure chat_history is a list of properly formatted messages
-            if not isinstance(chat_history, list):
-                chat_history = []
-            
-            # Validate each message in chat_history
-            validated_history = []
-            for msg in chat_history:
-                if isinstance(msg, dict) and "role" in msg and "content" in msg:
-                    validated_history.append(msg)
-            
-            # Return the combined history
-            return validated_history + new_messages
             
         except Exception as agent_error:
             print(f"Agent error: {str(agent_error)}")
-            return chat_history + [
-                {"role": "user", "content": question},
-                {"role": "assistant", "content": f"I encountered an error while processing your question: {str(agent_error)}"}
+            return [
+                [question, f"I encountered an error while processing your question: {str(agent_error)}"]
             ]
         
     except Exception as e:
@@ -722,15 +569,8 @@ def chat_with_data_safe(question, df, chat_history=None, summary=None):
         import traceback
         traceback.print_exc()
         
-        error_message = f"Error processing question: {str(e)}"
-        
-        # Return error in the correct format
-        if not isinstance(chat_history, list):
-            chat_history = []
-            
-        return chat_history + [
-            {"role": "user", "content": question},
-            {"role": "assistant", "content": error_message}
+        return [
+            [question, f"Error processing question: {str(e)}"]
         ]
 
     
@@ -744,6 +584,60 @@ def chat_with_data_safe(question, df, chat_history=None, summary=None):
         clear.click(lambda: [], None, chatbot, queue=False)
     
     return demo
+
+def chat_handler(message, df, history, summary, use_enhanced_mode=False):
+    # Only process if there's a message
+    if message:
+        if use_enhanced_mode:
+            chat_response = chat_with_data_enhanced(message, df, history, summary)
+        else:
+            chat_response = chat_with_data_safe(message, df, history, summary)
+        
+        # Initialize history if None
+        if history is None:
+            history = []
+        
+        # Convert the response to the correct format for Gradio chatbot with type='messages'
+        if isinstance(chat_response, list) and len(chat_response) > 0:
+            # Handle the new message pair
+            if isinstance(chat_response[0], list) and len(chat_response[0]) == 2:
+                # Format is [[user_msg, assistant_msg]]
+                user_msg, assistant_msg = chat_response[0]
+                new_messages = [
+                    {"role": "user", "content": user_msg},
+                    {"role": "assistant", "content": assistant_msg}
+                ]
+            else:
+                # Convert from old dict format if needed
+                new_messages = []
+                for i in range(0, len(chat_response), 2):
+                    if i + 1 < len(chat_response):
+                        user_msg = chat_response[i].get("content", "") if isinstance(chat_response[i], dict) else chat_response[i]
+                        assistant_msg = chat_response[i + 1].get("content", "") if isinstance(chat_response[i + 1], dict) else chat_response[i + 1]
+                        new_messages.extend([
+                            {"role": "user", "content": user_msg},
+                            {"role": "assistant", "content": assistant_msg}
+                        ])
+            
+            # Convert existing history to the correct format if needed
+            formatted_history = []
+            for msg in history:
+                if isinstance(msg, list) and len(msg) == 2:
+                    # Convert [user_msg, assistant_msg] format
+                    formatted_history.extend([
+                        {"role": "user", "content": msg[0]},
+                        {"role": "assistant", "content": msg[1]}
+                    ])
+                elif isinstance(msg, dict) and "role" in msg and "content" in msg:
+                    # Already in correct format
+                    formatted_history.append(msg)
+            
+            # Combine history with new messages
+            formatted_history.extend(new_messages)
+            
+            return "", formatted_history  # Clear the message box and update chat history
+        
+    return message, history  # Keep existing state if no message
 
 def main():
     demo = gr.Blocks(
@@ -769,10 +663,14 @@ def main():
 
         with gr.Row():
             with gr.Column():
-                chatbot = gr.Chatbot(show_label=False)
+                # Initialize chatbot with empty list and correct message format
+                chatbot = gr.Chatbot(
+                    show_label=False,
+                    type='messages',
+                    value=[]
+                )
                 msg = gr.Textbox(label="Ask questions about the analysis results")
                 
-                # Add a checkbox for switching between safe and enhanced mode
                 enhanced_mode = gr.Checkbox(label="Use Enhanced Analysis Mode", value=False)
                 
                 gr.Markdown("### Example Questions:")
@@ -784,9 +682,10 @@ def main():
                 
                 clear = gr.Button("Clear Chat")
 
-        # Example question handlers with proper argument handling
+        # Example question handlers
         def set_message(question):
-            return question, None  # Return both the message and None for the chatbot
+            # Return empty history since the message will be processed by chat_handler
+            return question, []
 
         q1.click(
             fn=lambda: set_message("What are the characteristics of high-performing posts?"),
@@ -809,8 +708,8 @@ def main():
             outputs=[msg, chatbot]
         )
 
-        # Clear chat history
-        clear.click(lambda: (None, None), outputs=[msg, chatbot])
+        # Clear chat history - return empty list in correct format
+        clear.click(lambda: (None, []), outputs=[msg, chatbot])
 
         # File analysis handler
         analyze_button.click(
@@ -819,17 +718,7 @@ def main():
             outputs=[status, updated_file_download, summary_download, processed_data_state, summary_state]
         )
 
-        # Message handler - modified to handle both msg and chatbot outputs
-        def chat_handler(message, df, history, summary, use_enhanced_mode=False):
-            # Only process if there's a message
-            if message:
-                if use_enhanced_mode:
-                    chat_response = chat_with_data_enhanced(message, df, history, summary)
-                else:
-                    chat_response = chat_with_data_safe(message, df, history, summary)
-                return "", chat_response  # Clear the message box and update chat history
-            return message, history  # Keep existing state if no message
-
+        # Message handler
         msg.submit(
             chat_handler,
             inputs=[msg, processed_data_state, chatbot, summary_state, enhanced_mode],
@@ -850,4 +739,4 @@ if __name__ == "__main__":
         )
     else:
         # We're running locally
-        demo.launch() 
+        demo.launch(share=True) 
