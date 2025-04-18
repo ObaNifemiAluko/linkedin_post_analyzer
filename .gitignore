@@ -17,6 +17,9 @@ ENV/
 # Generated files
 *.xlsx
 summary.md
+*.log
 
-# Logs
-*.log 
+# Temporary files
+.DS_Store
+*.swp
+*.swo 

@@ -769,9 +769,7 @@ def main():
 
         with gr.Row():
             with gr.Column():
-                chatbot = gr.Chatbot(
-                    label="Chat about your LinkedIn Post Analysis"
-                )
+                chatbot = gr.Chatbot(show_label=False)
                 msg = gr.Textbox(label="Ask questions about the analysis results")
                 
                 # Add a checkbox for switching between safe and enhanced mode
