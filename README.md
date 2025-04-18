@@ -1,3 +1,14 @@
+---
+title: LinkedIn Post Analyzer
+emoji: 📊
+colorFrom: blue
+colorTo: indigo
+sdk: gradio
+sdk_version: 4.19.2
+app_file: app.py
+pinned: false
+---
+
 # LinkedIn Post Analyzer
 
 A powerful tool for analyzing LinkedIn posts to gain insights into content performance and engagement patterns. Upload your LinkedIn posts data and get AI-powered insights about your content strategy.
