@@ -748,7 +748,6 @@ def chat_with_data_safe(question, df, chat_history=None, summary=None):
 def main():
     demo = gr.Blocks(
         title="LinkedIn Post Analyzer",
-        description="Analyze your LinkedIn posts data (CSV or Excel) to gain insights into content performance and engagement patterns.",
         css="footer {display: none !important;}"
     )
     
