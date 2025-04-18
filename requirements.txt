@@ -7,6 +7,6 @@ langchain==0.1.9
 langchain-openai==0.0.8
 langchain-community==0.0.24
 langchain-core==0.1.27
-langchain-experimental==0.0.52
+langchain-experimental==0.0.43
 openpyxl==3.1.2
 openai==1.12.0
