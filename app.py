@@ -263,7 +263,7 @@ def setup_langchain_agent(df):
     try:
         # Create a Pandas DataFrame agent
         llm = ChatOpenAI(
-            model_name="gpt-4o",
+            model_name="gpt-4",
             temperature=0.2
         )
         agent = create_pandas_dataframe_agent(

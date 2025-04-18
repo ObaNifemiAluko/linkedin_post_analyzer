@@ -494,22 +494,11 @@ def setup_langchain_agent(df):
 def setup_safe_analysis_agent(df):
     """Set up a safe LangChain agent that can perform calculations and analysis on the DataFrame"""
     try:
-        # Create a Pandas DataFrame agent with safety constraints - with extra error handling
-        try:
-            # First try with basic parameters only
-            llm = ChatOpenAI(
-                model_name="gpt-4",
-                temperature=0.2
-            )
-        except Exception as llm_error:
-            print(f"Error initializing ChatOpenAI: {str(llm_error)}")
-            # Fall back to even simpler initialization
-            try:
-                llm = ChatOpenAI()
-                print("Using default ChatOpenAI configuration")
-            except Exception as fallback_error:
-                print(f"Critical error with ChatOpenAI: {str(fallback_error)}")
-                return None
+        # Create a Pandas DataFrame agent with safety constraints
+        llm = ChatOpenAI(
+            model_name="gpt-4",
+            temperature=0.2
+        )
         
         # Define safe analysis tools
         tools = [
@@ -530,104 +519,57 @@ def setup_safe_analysis_agent(df):
             )
         ]
         
-        # Create the agent with the safe tools - added specific handling for different environments
-        try:
-            # Create a simpler prompt that works in all environments
-            system_message = """You are an expert data analyst specializing in LinkedIn post analytics.
-            You have access to a DataFrame with LinkedIn post data and metrics and can answer questions about it."""
+        # Create the agent with the safe tools
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", """You are an expert data analyst specializing in LinkedIn post analytics.
+            You have access to a DataFrame with LinkedIn post data and metrics.
+            You can perform calculations, statistical analysis, and answer questions about the data.
+            Analyze the data carefully and provide detailed insights backed by specific metrics.
             
-            # Try using more basic prompt structure for compatibility
-            prompt = ChatPromptTemplate.from_messages([
-                ("system", system_message),
-                ("human", "{input}")
-            ])
-            
-            # This simpler agent creation should work in more environments
-            agent = create_openai_tools_agent(llm, tools, prompt)
-            return AgentExecutor(agent=agent, tools=tools, verbose=True)
-        except Exception as e:
-            print(f"Error creating agent with standard prompt: {str(e)}")
-            # Try an even simpler approach if the first fails
-            try:
-                # Create a direct agent instead of using the tool-based approach
-                from langchain.agents import AgentType, initialize_agent
-                return initialize_agent(
-                    tools=tools,
-                    llm=llm,
-                    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-                    verbose=True
-                )
-            except Exception as alt_error:
-                print(f"Error creating alternative agent: {str(alt_error)}")
-                return None
-                
+            The DataFrame includes the following columns:
+            - Full Post: The complete text of the LinkedIn post
+            - Reactions: Number of reactions (likes etc.) received
+            - Comment: Number of comments received
+            - Reposts: Number of reposts/shares
+            - Word Count: Number of words in the post
+            - Flesch Reading Ease: Readability score
+            - Topic: The main topic category of the post
+            - Writing Tone: The tone used in the post
+            - Intent: The purpose of the post (Inform, Convince, etc.)
+            - Formatting: Structure and formatting characteristics"""),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("human", "{input}"),
+            ("assistant", "{agent_scratchpad}")
+        ])
+        
+        agent = create_openai_tools_agent(llm, tools, prompt)
+        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+        
+        return agent_executor
     except Exception as e:
         print(f"Error setting up safe analysis agent: {str(e)}")
         return None
 
+# Add the missing setup_enhanced_analysis_agent function
 def setup_enhanced_analysis_agent(df):
     """Set up an enhanced LangChain agent that can perform calculations and analysis on the DataFrame"""
     try:
-        # Create a Pandas DataFrame agent - with extra error handling
-        try:
-            # First try with basic parameters
-            llm = ChatOpenAI(
-                model_name="gpt-4",
-                temperature=0.2
-            )
-        except Exception as llm_error:
-            print(f"Error initializing ChatOpenAI: {str(llm_error)}")
-            # Fall back to even simpler initialization
-            try:
-                llm = ChatOpenAI()
-                print("Using default ChatOpenAI configuration")
-            except Exception as fallback_error:
-                print(f"Critical error with ChatOpenAI: {str(fallback_error)}")
-                return None
+        # Create a Pandas DataFrame agent
+        llm = ChatOpenAI(
+            model_name="gpt-4",
+            temperature=0.2
+        )
         
-        # Safely attempt to create the agent with version detection
-        # Try the most minimalist approach first
-        try:
-            from langchain.agents import AgentType, initialize_agent
-            from langchain_community.agent_toolkits import create_pandas_dataframe_agent
-            
-            # Try to use the version that's most compatible with various environments
-            return create_pandas_dataframe_agent(
-                llm,
-                df,
-                verbose=True
-            )
-        except Exception as pandas_error:
-            print(f"Error with community pandas agent: {str(pandas_error)}")
-            
-            # If that fails, try with the experimental version but with minimal parameters
-            try:
-                return create_pandas_dataframe_agent(
-                    llm,
-                    df,
-                    verbose=True
-                )
-            except Exception as final_err:
-                print(f"Final error creating pandas agent: {str(final_err)}")
-                
-                # Last resort - try to use initialize_agent with custom tools
-                try:
-                    from langchain.tools.python.tool import PythonAstREPLTool
-                    
-                    # Create a Python REPL tool with the dataframe
-                    python_tool = PythonAstREPLTool(locals={"df": df})
-                    
-                    # Initialize an agent with this tool
-                    return initialize_agent(
-                        tools=[python_tool],
-                        llm=llm,
-                        agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-                        verbose=True
-                    )
-                except Exception as e:
-                    print(f"Could not create any agent: {str(e)}")
-                    return None
-                    
+        # Use the pandas dataframe agent
+        agent = create_pandas_dataframe_agent(
+            llm, 
+            df, 
+            verbose=True,
+            handle_parsing_errors=True,
+            include_df_in_prompt=True
+        )
+        
+        return agent
     except Exception as e:
         print(f"Error setting up enhanced analysis agent: {str(e)}")
         return None 
