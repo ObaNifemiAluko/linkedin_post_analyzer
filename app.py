@@ -302,13 +302,6 @@ def chat_with_data_enhanced(question, df, chat_history=None, summary=None):
         # Initialize chat history if None
         if chat_history is None:
             chat_history = []
-        # Convert tuple format to list format if needed
-        elif isinstance(chat_history, list) and len(chat_history) > 0 and isinstance(chat_history[0], list):
-            chat_history = [
-                {"role": "user" if i % 2 == 0 else "assistant", "content": msg}
-                for pair in chat_history
-                for i, msg in enumerate(pair)
-            ]
 
         if df is None:
             return [
@@ -337,12 +330,18 @@ def chat_with_data_enhanced(question, df, chat_history=None, summary=None):
         # Enhanced question with context if needed
         enhanced_question = f"{context}Based on the LinkedIn post data, {question}"
         
-        # Format chat history for the agent
+        # Format chat history for the agent - works with both formats
         formatted_history = []
         for msg in chat_history:
-            if isinstance(msg, dict):
-                role = msg.get("role", "")
-                content = msg.get("content", "")
+            if isinstance(msg, list) and len(msg) == 2:
+                # Old format: [user_msg, assistant_msg]
+                user_msg, assistant_msg = msg
+                formatted_history.append(("human", user_msg))
+                formatted_history.append(("ai", assistant_msg))
+            elif isinstance(msg, dict) and "role" in msg and "content" in msg:
+                # New format: {"role": "...", "content": "..."}
+                role = msg["role"]
+                content = msg["content"]
                 if role == "user":
                     formatted_history.append(("human", content))
                 elif role == "assistant":
@@ -357,7 +356,7 @@ def chat_with_data_enhanced(question, df, chat_history=None, summary=None):
             if not isinstance(answer, str):
                 answer = str(answer)
             
-            # Return in the format Gradio expects: list of [user_message, assistant_message] pairs
+            # Return in a consistent format that works with both Gradio versions
             return [
                 [question, answer]
             ]
@@ -498,17 +497,10 @@ def chat_with_data_safe(question, df, chat_history=None, summary=None):
         # Initialize chat history if None
         if chat_history is None:
             chat_history = []
-        # Convert tuple format to list format if needed
-        elif isinstance(chat_history, list) and len(chat_history) > 0 and isinstance(chat_history[0], list):
-            chat_history = [
-                {"role": "user" if i % 2 == 0 else "assistant", "content": msg}
-                for pair in chat_history
-                for i, msg in enumerate(pair)
-            ]
-
+        
         if df is None:
             return [
-                ["Please analyze a file first.", None]
+                [question, "Please analyze a file first."]
             ]
         
         # Debug what we received
@@ -533,12 +525,18 @@ def chat_with_data_safe(question, df, chat_history=None, summary=None):
         # Enhanced question with context if needed
         enhanced_question = f"{context}Based on the LinkedIn post data, {question}"
         
-        # Format chat history for the agent
+        # Format chat history for the agent - works with both formats
         formatted_history = []
         for msg in chat_history:
-            if isinstance(msg, dict):
-                role = msg.get("role", "")
-                content = msg.get("content", "")
+            if isinstance(msg, list) and len(msg) == 2:
+                # Old format: [user_msg, assistant_msg]
+                user_msg, assistant_msg = msg
+                formatted_history.append(("human", user_msg))
+                formatted_history.append(("ai", assistant_msg))
+            elif isinstance(msg, dict) and "role" in msg and "content" in msg:
+                # New format: {"role": "...", "content": "..."}
+                role = msg["role"]
+                content = msg["content"]
                 if role == "user":
                     formatted_history.append(("human", content))
                 elif role == "assistant":
@@ -553,7 +551,7 @@ def chat_with_data_safe(question, df, chat_history=None, summary=None):
             if not isinstance(answer, str):
                 answer = str(answer)
             
-            # Return in the format Gradio expects: list of [user_message, assistant_message] pairs
+            # Return in a consistent format that works with both Gradio versions
             return [
                 [question, answer]
             ]
@@ -597,45 +595,61 @@ def chat_handler(message, df, history, summary, use_enhanced_mode=False):
         if history is None:
             history = []
         
-        # Convert the response to the correct format for Gradio chatbot with type='messages'
+        # Check if we're using the newer Gradio with messages format
+        try:
+            # Check Gradio version first
+            gradio_version = gr.__version__
+            using_messages_format = False
+            
+            try:
+                from packaging import version
+                if version.parse(gradio_version) >= version.parse("4.44.0"):
+                    using_messages_format = True
+            except ImportError:
+                # If packaging is not available, do a simple string comparison
+                using_messages_format = gradio_version >= "4.44.0"
+        except:
+            using_messages_format = False
+            
+        # Process chat response
         if isinstance(chat_response, list) and len(chat_response) > 0:
             # Handle the new message pair
             if isinstance(chat_response[0], list) and len(chat_response[0]) == 2:
                 # Format is [[user_msg, assistant_msg]]
                 user_msg, assistant_msg = chat_response[0]
-                new_messages = [
-                    {"role": "user", "content": user_msg},
-                    {"role": "assistant", "content": assistant_msg}
-                ]
-            else:
-                # Convert from old dict format if needed
-                new_messages = []
-                for i in range(0, len(chat_response), 2):
-                    if i + 1 < len(chat_response):
-                        user_msg = chat_response[i].get("content", "") if isinstance(chat_response[i], dict) else chat_response[i]
-                        assistant_msg = chat_response[i + 1].get("content", "") if isinstance(chat_response[i + 1], dict) else chat_response[i + 1]
-                        new_messages.extend([
-                            {"role": "user", "content": user_msg},
-                            {"role": "assistant", "content": assistant_msg}
-                        ])
-            
-            # Convert existing history to the correct format if needed
-            formatted_history = []
-            for msg in history:
-                if isinstance(msg, list) and len(msg) == 2:
-                    # Convert [user_msg, assistant_msg] format
-                    formatted_history.extend([
-                        {"role": "user", "content": msg[0]},
-                        {"role": "assistant", "content": msg[1]}
-                    ])
-                elif isinstance(msg, dict) and "role" in msg and "content" in msg:
-                    # Already in correct format
-                    formatted_history.append(msg)
-            
-            # Combine history with new messages
-            formatted_history.extend(new_messages)
-            
-            return "", formatted_history  # Clear the message box and update chat history
+                
+                if using_messages_format:
+                    # Convert history to messages format if it's not already
+                    if history and not (isinstance(history[0], dict) and "role" in history[0]):
+                        converted_history = []
+                        for msg_pair in history:
+                            if isinstance(msg_pair, list) and len(msg_pair) == 2:
+                                user, assistant = msg_pair
+                                converted_history.append({"role": "user", "content": user})
+                                converted_history.append({"role": "assistant", "content": assistant})
+                        history = converted_history
+                    
+                    # New format (Gradio 4.44+)
+                    new_messages = [
+                        {"role": "user", "content": user_msg},
+                        {"role": "assistant", "content": assistant_msg}
+                    ]
+                    
+                    # Return updated history in the messages format
+                    return "", history + new_messages
+                else:
+                    # Old format (Gradio 4.19 or earlier)
+                    # Ensure history is in the old format if it's not already
+                    if history and isinstance(history[0], dict) and "role" in history[0]:
+                        converted_history = []
+                        for i in range(0, len(history), 2):
+                            if i+1 < len(history):
+                                user = history[i].get("content", "")
+                                assistant = history[i+1].get("content", "")
+                                converted_history.append([user, assistant])
+                        history = converted_history
+                    
+                    return "", history + [[user_msg, assistant_msg]]
         
     return message, history  # Keep existing state if no message
 
@@ -663,12 +677,40 @@ def main():
 
         with gr.Row():
             with gr.Column():
-                # Initialize chatbot with empty list and correct message format
-                chatbot = gr.Chatbot(
-                    show_label=False,
-                    type='messages',
-                    value=[]
-                )
+                # Initialize chatbot with empty list - compatible with different Gradio versions
+                try:
+                    # Check Gradio version first
+                    gradio_version = gr.__version__
+                    supports_messages = False
+                    
+                    try:
+                        from packaging import version
+                        if version.parse(gradio_version) >= version.parse("4.44.0"):
+                            supports_messages = True
+                    except ImportError:
+                        # If packaging is not available, do a simple string comparison
+                        supports_messages = gradio_version >= "4.44.0"
+                    
+                    if supports_messages:
+                        # Use newer syntax with messages type
+                        chatbot = gr.Chatbot(
+                            show_label=False,
+                            type='messages',
+                            value=[]
+                        )
+                    else:
+                        # Use older syntax without type parameter
+                        chatbot = gr.Chatbot(
+                            show_label=False,
+                            value=[]
+                        )
+                except Exception as e:
+                    print(f"Error initializing chatbot: {str(e)}")
+                    # Fall back to the older syntax if anything goes wrong
+                    chatbot = gr.Chatbot(
+                        show_label=False,
+                        value=[]
+                    )
                 msg = gr.Textbox(label="Ask questions about the analysis results")
                 
                 enhanced_mode = gr.Checkbox(label="Use Enhanced Analysis Mode", value=False)
